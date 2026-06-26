@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leadstack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800&family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.400.0/dist/umd/lucide.js"></script>
+    <style>
+        :root {
+            --magenta-main: #d63384;
+            --magenta-hover: #bc136a;
+            --magenta-bg: #fff0f6;
+            --text-dark: #2b2b2b;
+            --text-muted: #666;
+            --red-free: #dc3545;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-dark);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            background-color: #fafafa;
+            background-image: 
+                linear-gradient(rgba(214, 51, 132, 0.02) 2px, transparent 2px), 
+                linear-gradient(90deg, rgba(214, 51, 132, 0.02) 2px, transparent 2px), 
+                linear-gradient(rgba(214, 51, 132, 0.015) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(214, 51, 132, 0.015) 1px, #fafafa 1px),
+                radial-gradient(at 0% 0%, hsla(332, 70%, 95%, 0.7) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, hsla(332, 70%, 93%, 0.7) 0px, transparent 50%);
+            background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px, auto, auto;
+            background-attachment: fixed;
+        }
+        header.top-nav {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .nav-left-group {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .nav-logo {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            font-size: 1.3rem;
+            color: var(--magenta-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-auth-btn {
+            background-color: transparent;
+            color: var(--magenta-main);
+            border: 2px solid var(--magenta-main);
+            padding: 8px 18px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .nav-auth-btn:hover { background-color: var(--magenta-main); color: white; }
+        
+        .partners-wrapper { position: relative; }
+        .partners-menu { position: absolute; top: 100%; right: 0; margin-top: 10px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px; min-width: 160px; z-index: 100; }
+        .partners-menu a { text-decoration: none; color: var(--text-dark); font-weight: 600; font-size: 0.9rem; transition: color 0.2s; }
+        .partners-menu a:hover { color: var(--magenta-main); }
+        
+        .auth-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        .popup-card {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+            text-align: center;
+            border: 1px solid #f0e4eb;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 20px; right: 20px;
+            background: transparent; border: none;
+            color: var(--text-muted); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .close-modal:hover { color: var(--text-dark); }
+        .auth-tabs {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 25px;
+            gap: 15px;
+        }
+        .auth-tab-btn {
+            flex: 1;
+            padding-bottom: 10px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .auth-tab-btn.active {
+            color: var(--magenta-main);
+            border-bottom: 3px solid var(--magenta-main);
+            margin-bottom: -2px;
+        }
+        .popup-card p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px; line-height: 1.4; }
+        .input-group { margin-bottom: 16px; text-align: left; }
+        .input-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-dark); }
+        .input-group input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 1rem; box-sizing: border-box; transition: border-color 0.2s ease; }
+        .input-group input:focus { outline: none; border-color: var(--magenta-main); }
+        .btn-primary { width: 100%; background: var(--magenta-main); color: white; border: none; padding: 14px; font-size: 1rem; font-weight: 700; border-radius: 12px; cursor: pointer; transition: background 0.2s ease; margin-top: 10px; }
+        .btn-primary:hover { background: var(--magenta-hover); }
+        .msg-box { padding: 12px; border-radius: 10px; font-size: 0.88rem; margin-bottom: 20px; text-align: left; line-height: 1.4; }
+        .msg-box.error { background: #fff5f5; color: #e53e3e; border: 1px solid #fed7d7; }
+        .msg-box.success { background: #f0fff4; color: #38a169; border: 1px solid #c6f6d5; }
+        .hidden { display: none !important; }
+        
+        .dashboard-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; padding-bottom: 40px; box-sizing: border-box; }
+        .hero-banner-container { width: 92%; max-width: 1200px; background-color: var(--magenta-main); color: white; text-align: center; padding: 35px 30px; box-sizing: border-box; margin-bottom: 45px; border-radius: 24px; box-shadow: 0 15px 35px rgba(214, 51, 132, 0.12); }
+        .brand-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 12px; }
+        .banner-logo { width: 38px; height: 38px; color: #ffffff; stroke-width: 2.5px; }
+        .hero-banner-container h1 { font-family: 'Montserrat', sans-serif; font-size: 2.6rem; margin: 0; font-weight: 800; color: #ffffff; }
+        .hero-banner-container p { font-family: 'Montserrat', sans-serif; font-size: 1.1rem; max-width: 800px; margin: 0 auto; line-height: 1.5; opacity: 0.95; }
+        
+        .workspace-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr;
+            align-items: start;
+            gap: 25px; 
+            width: 92%; 
+            max-width: 1200px; 
+            box-sizing: border-box; 
+        }
+
+        .inner-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            width: 100%;
+        }
+
+        .tool-box {
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(4px);
+            border: 2px solid #e2e8f0;
+            border-radius: 24px;
+            padding: 35px 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-sizing: border-box;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            aspect-ratio: 1 / 1; 
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .tool-box:hover {
+            border-color: var(--magenta-main);
+            background-color: var(--magenta-bg);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(214, 51, 132, 0.08);
+        }
+        
+        .tool-box.highlight-magenta {
+            border: 3px solid var(--magenta-main);
+            box-shadow: 0 15px 35px rgba(214, 51, 132, 0.1);
+        }
+        .tool-box.highlight-magenta:hover {
+            background-color: var(--magenta-bg);
+            box-shadow: 0 20px 40px rgba(214, 51, 132, 0.15);
+        }
+        
+        .badge-square {
+            position: absolute;
+            top: 0; left: 0;
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 16px;
+            border-bottom-right-radius: 14px;
+            border-top-left-radius: 21px; 
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 5;
+        }
+        .badge-green { background-color: #28a745; }
+        .badge-red { background-color: var(--red-free); }
+
+        .tool-box svg, .tool-box img { color: var(--magenta-main); stroke-width: 2px; width: 44px; height: 44px; margin-bottom: 15px; transition: transform 0.3s ease; flex-shrink: 0; }
+        .tool-box img { border-radius: 8px; object-fit: cover; }
+        .tool-box:hover svg, .tool-box:hover img { transform: scale(1.1); }
+        .tool-box span { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 1.15rem; margin-bottom: 10px; color: var(--text-dark); line-height: 1.3; }
+        .tool-box p { font-size: 0.8rem; color: var(--text-muted); margin: 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 4;line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .user-tray { width: 92%; max-width: 1200px; display: flex; justify-content: flex-end; align-items: center; margin-top: 25px; gap: 15px; }
+        .user-welcome { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
+        .btn-logout { background: transparent; border: 1px solid #cbd5e1; color: var(--text-muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.88rem; transition: all 0.2s; }
+        .btn-logout:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
+
+        .footer-note { width: 100%; text-align: center; padding: 30px 20px; margin-top: auto; box-sizing: border-box; }
+        .footer-note a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; font-weight: 600; transition: color 0.2s ease; }
+        .footer-note a:hover { color: var(--magenta-main); }
+
+        @media (max-width: 850px) {
+            .workspace-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 550px) {
+            .inner-grid { grid-template-columns: 1fr; }
+            .hero-banner-container h1 { font-size: 2.1rem; }
+            .nav-left-group { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="top-nav">
+        <div class="nav-left-group">
+            <div class="nav-logo">
+                <i data-lucide="layers-3" size="24"></i> Leadstack
+            </div>
+        </div>
+        <div class="share-wrapper">
+            <button id="shareBtn" class="nav-auth-btn">
+                <i data-lucide="share-2" size="18" style="vertical-align: middle; margin-right: 5px;"></i> Share
+            </button>
+        </div>
+        <button id="navAuthBtn" class="nav-auth-btn" style="display: none;">Sign In / Sign Up</button>
+    </header>
+
+    <div id="authOverlay" class="auth-overlay hidden">
+        <div id="loginCard" class="popup-card">
+            <button id="closeAuthBtn" class="close-modal"><i data-lucide="x" size="20"></i></button>
+            <div class="auth-tabs">
+                <button id="tabSignIn" class="auth-tab-btn active">Sign In</button>
+                <button id="tabSignUp" class="auth-tab-btn">Sign Up</button>
+            </div>
+            <p id="authCardDescription">Log in to your free Leadstack account to deploy your active scrapers.</p>
+            <div id="errorMsg" class="msg-box error hidden"></div>
+            <div id="successMsg" class="msg-box success hidden"></div>
+            <div id="nameGroup" class="input-group hidden">
+                <label for="username">Full Name</label>
+                <input type="text" id="username" placeholder="Alex Mercer">
+            </div>
+            <div class="input-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="name@company.com">
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="...">
+            </div>
+            <button id="authSubmitBtn" class="btn-primary">Sign In Account</button>
+        </div>
+    </div>
+
+    <div class="dashboard-wrapper">
+        <header class="hero-banner-container">
+            <div class="brand-container">
+                <i data-lucide="layers-3" class="banner-logo"></i>
+                <h1>Leadstack</h1>
+            </div>
+            <p>Sign up or sign in to access your favourite Leadstack scraper workspace.</p>
+        </header>
+
+        <main class="workspace-grid">
+            
+            <div style="border: 3px solid #28a745; border-radius: 24px; padding: 25px; position: relative; background-color: rgba(40,167,69,0.05); box-shadow: 0 15px 35px rgba(40, 167, 69, 0.1); height: 100%; box-sizing: border-box;">
+                <div class="badge-square badge-green">Free</div>
+                <div class="inner-grid" style="margin-top: 20px;">
+                    <div id="tool-telegram" class="tool-box free-tool">
+                        <i data-lucide="send"></i>
+                        <span>Telegram</span>
+                        <p>Extract hyper-engaged community channels, users, and alpha-callers.</p>
+                    </div>
+
+                    <div id="tool-youtube" class="tool-box free-tool">
+                        <i data-lucide="youtube"></i>
+                        <span>YouTube</span>
+                        <p>Target active channels, view velocities, and creator business inquiries.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="border: 3px solid var(--magenta-main); border-radius: 24px; padding: 25px; background-color: var(--magenta-bg); box-shadow: 0 15px 35px rgba(214, 51, 132, 0.1); height: 100%; box-sizing: border-box; position: relative;">
+                <div class="badge-square" style="background-color: var(--magenta-main);">Other apps</div>
+                <div class="inner-grid" style="margin-top: 20px;">
+                    
+                    <a href="#" style="text-decoration: none; display: block; color: inherit;">
+                        <div id="tool-autobot" class="tool-box">
+                            <img src="Autobot.png" alt="Autobot Icon" />
+                            <span>Autobot</span>
+                            <p>AI-powered algorithmic trading. Automate your trading over equity and crypto markets for free! </p>
+                        </div>
+                    </a>
+
+                    <a href="#" style="text-decoration: none; display: block; color: inherit;">
+                        <div id="tool-bonanza" class="tool-box">
+                            <img src="Bonanza.png" alt="Bonanza Icon" />
+                            <span>Bonanza</span>
+                            <p>Get Free Coupons! Grab Exclusive Deals and Offers from your Favourite Brands.</p>
+                        </div>
+                    </a>
+
+                </div>
+            </div>
+
+        </main>
+
+        <div id="userTray" class="user-tray hidden">
+            <span id="userBadge" class="user-welcome"></span>
+            <button id="logoutBtn" class="btn-logout">Sign Out</button>
+        </div>
+    </div>
+
+    <footer class="footer-note">
+        <a href="mailto:leadstack3@gmail.com">Need Help? Contact Support</a>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const shareBtn = document.getElementById('shareBtn');
+            if (shareBtn) {
+                shareBtn.addEventListener('click', async () => {
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: document.title,
+                                url: window.location.href
+                            });
+                        } catch (err) {
+                            console.error('Share failed or was cancelled:', err);
+                        }
+                    } else {
+                        navigator.clipboard.writeText(window.location.href).then(() => {
+                            alert('Link copied to clipboard!');
+                        }).catch(err => {
+                            console.error('Could not copy text: ', err);
+                        });
+                    }
+                });
+            }
+        });
+
+        // This intercepts the clicks on the free tools and routes them 
+        // through your original hidden auth button, keeping auth.js working perfectly.
+        const freeTools = document.querySelectorAll('.free-tool');
+        const hiddenAuthBtn = document.getElementById('navAuthBtn');
+
+        if (hiddenAuthBtn) {
+            freeTools.forEach(tool => {
+                tool.addEventListener('click', function(event) {
+                    event.preventDefault(); 
+                    hiddenAuthBtn.click();
+                });
+            });
+        }
+    </script>
+    <script src="auth.js"></script>
+</body>
+</html>

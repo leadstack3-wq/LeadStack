@@ -1,30 +1,12 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import re
 import requests
 import os
-import jwt
 from googleapiclient.discovery import build
 
 # --- Page Configuration ---
-st.set_page_config(page_title="Leadstack YouTube", layout="wide", page_icon="ðŸŽ¥")
-
-# =========================================================
-# ðŸ” TOKEN GATE
-# =========================================================
-_JWT_SECRET = os.environ.get("JWT_SECRET", "")
-_token = st.query_params.get("token", "")
-if not _token or not _JWT_SECRET:
-    st.error("ðŸ”’ Access Denied: No valid session token. Please sign in from the Leadstack dashboard.")
-    st.stop()
-try:
-    _payload = jwt.decode(_token, _JWT_SECRET, algorithms=["HS256"])
-except jwt.ExpiredSignatureError:
-    st.error("ðŸ”’ Session Expired: Please log in again from the Leadstack dashboard.")
-    st.stop()
-except Exception:
-    st.error("ðŸ”’ Access Denied: Invalid session token.")
-    st.stop()
+st.set_page_config(page_title="Leadstack YouTube", layout="wide", page_icon="🎥")
 
 # --- Professional Light Mode & YouTube Red Accent Injection ---
 st.markdown("""
@@ -136,7 +118,7 @@ st.markdown(
     "<div style='padding:22px; border-radius:18px;"
     "background: linear-gradient(90deg, #FF0000, #CC0000);"
     "color: white; margin-bottom: 1.5rem; box-shadow: 0 8px 25px rgba(255,0,0,0.2);'>"
-    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>ðŸŽ¥ YouTube Leads Generator</h1>"
+    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>🎥 YouTube Leads Generator</h1>"
     "<p style='margin:5px 0 0 0; color:#FFFFFF !important; opacity:0.95; font-size:15px;'>Query, filter, and isolate creators using Subscribers, Video Counts, Channel Views, and About-bio keywords.</p>"
     "</div>",
     unsafe_allow_html=True
@@ -145,7 +127,7 @@ st.markdown(
 # =========================================================
 # INITIALIZE SESSION STATE FOR PERSISTENT DATA & PERM FILE
 # =========================================================
-DATA_DIR = "/data" if os.path.exists("/data") else "."
+DATA_DIR = "."
 HISTORY_FILE = os.path.join(DATA_DIR, "permanently_seen_youtube_channels.txt")
 
 # Load history from local file storage if it exists to maintain day-to-day permanent memory
@@ -160,10 +142,10 @@ if "seen_youtube_channels" not in st.session_state:
 # CALCULATION UTILITY
 # =====================
 def get_channel_tier(subs):
-    if subs >= 1000000: return "ðŸ‘‘ Mega Creator"
-    if subs >= 100000: return "ðŸ’Ž Macro Influencer"
-    if subs >= 10000: return "ðŸš€ Micro Creator"
-    return "ðŸŒ± Nano Influencer"
+    if subs >= 1000000: return "👑 Mega Creator"
+    if subs >= 100000: return "💎 Macro Influencer"
+    if subs >= 10000: return "🚀 Micro Creator"
+    return "🌱 Nano Influencer"
 
 def extract_email_from_text(text):
     """Parses text fields using regular expressions to isolate valid public emails."""
@@ -282,17 +264,17 @@ def fetch_youtube_channels(api_key, keyword, region_code, min_subs, max_subs, mi
 # SIDEBAR NAVIGATION
 # =====================
 with st.sidebar:
-    st.header("ðŸ”‘ Google API Token")
+    st.header("🔑 Google API Token")
     api_token = st.text_input("YouTube Data API Key", type="password", help="Obtain a v3 API key from Google Cloud Console.")
     
     st.divider()
-    st.header("ðŸ“Š Delivery Destination")
+    st.header("📊 Delivery Destination")
     user_gsheet_url = st.text_input("Google Apps Script URL", placeholder="https://script.google.com/...")
     
     st.divider()
-    st.markdown(f"ðŸ“¦ **Permanent Memory History:** `{len(st.session_state.seen_youtube_channels)}` channels remembered.")
+    st.markdown(f"📦 **Permanent Memory History:** `{len(st.session_state.seen_youtube_channels)}` channels remembered.")
     
-    start_button = st.button("ðŸš€ Harvest YouTube Channels", use_container_width=True)
+    start_button = st.button("🚀 Harvest YouTube Channels", use_container_width=True)
 
 # =========================================================================
 # WORKSPACE LAYOUT
@@ -375,7 +357,7 @@ if start_button:
                         st.markdown(f"""
                             <div class="yt-metric-card">
                                 <div class="yt-card-label">Pipelines Compiled</div>
-                                <div class="yt-card-value">ðŸ“¹ {len(df_sorted)} New Channels Found</div>
+                                <div class="yt-card-value">📹 {len(df_sorted)} New Channels Found</div>
                             </div>
                         """, unsafe_allow_html=True)
                     with m2:
@@ -383,7 +365,7 @@ if start_button:
                         st.markdown(f"""
                             <div class="yt-metric-card">
                                 <div class="yt-card-label">Average Subscriber Base</div>
-                                <div class="yt-card-value">ðŸ“Š {avg_subs:,} Subs</div>
+                                <div class="yt-card-value">📊 {avg_subs:,} Subs</div>
                             </div>
                         """, unsafe_allow_html=True)
                     
@@ -393,10 +375,10 @@ if start_button:
                     if user_gsheet_url:
                         with st.spinner("Streaming records to Sheets architecture..."):
                             requests.post(user_gsheet_url, json=df_sorted.to_dict(orient='records'))
-                            st.success("âœ… Shared Google Sheet synchronized!")
+                            st.success("✅ Shared Google Sheet synchronized!")
                     
                     csv_data = df_sorted.to_csv(index=False).encode('utf-8')
-                    st.download_button("ðŸ“¥ Download Filtered Directory (CSV)", csv_data, "youtube_fully_filtered_leads.csv")
+                    st.download_button("📥 Download Filtered Directory (CSV)", csv_data, "youtube_fully_filtered_leads.csv")
                     
             except Exception as e:
                 st.error(f"API Interface Error: {e}")

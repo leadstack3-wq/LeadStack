@@ -1,1 +1,0 @@
-JWT_SECRET = "the-exact-same-secret-you-set-on-render-backend"

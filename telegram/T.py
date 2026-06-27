@@ -1,34 +1,16 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import asyncio
 import requests
 import os
-import jwt
 from telethon import TelegramClient
 from telethon.tl.functions.contacts import SearchRequest
 from telethon.tl.functions.channels import GetFullChannelRequest
 
 # ==========================================
-# ðŸŽ¨ STREAMLIT PAGE CONFIG & TELEGRAM THEME
+# 🎨 STREAMLIT PAGE CONFIG & TELEGRAM THEME
 # ==========================================
-st.set_page_config(page_title="Leadstack Telegram", layout="wide", page_icon="âœ‰ï¸")
-
-# =========================================================
-# ðŸ” TOKEN GATE
-# =========================================================
-_JWT_SECRET = os.environ.get("JWT_SECRET", "")
-_token = st.query_params.get("token", "")
-if not _token or not _JWT_SECRET:
-    st.error("ðŸ”’ Access Denied: No valid session token. Please sign in from the Leadstack dashboard.")
-    st.stop()
-try:
-    _payload = jwt.decode(_token, _JWT_SECRET, algorithms=["HS256"])
-except jwt.ExpiredSignatureError:
-    st.error("ðŸ”’ Session Expired: Please log in again from the Leadstack dashboard.")
-    st.stop()
-except Exception:
-    st.error("ðŸ”’ Access Denied: Invalid session token.")
-    st.stop()
+st.set_page_config(page_title="Leadstack Telegram", layout="wide", page_icon="✉️")
 
 st.markdown("""
 <style>
@@ -128,73 +110,101 @@ st.markdown(
     "<div style='padding:22px; border-radius:18px;"
     "background: linear-gradient(90deg, #24A1DE, #147CB0);"
     "color: white; margin-bottom: 1.5rem; box-shadow: 0 6px 20px rgba(36,161,222,0.2);'>"
-    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>âœ‰ï¸ Telegram Leads Generator</h1>"
+    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>✉️ Telegram Leads Generator</h1>"
     "<p style='margin:5px 0 0 0; color:#FFFFFF !important; opacity:0.95; font-size:15px;'>Headless community mapping & engagement behavior analytics hub</p>"
     "</div>",
     unsafe_allow_html=True
 )
 
 # =========================================================
-# INITIALIZE SESSION STATE FOR PERSISTENT DATA & PERM FILE
+# PER-USER SESSION & HISTORY FILE NAMING
 # =========================================================
-DATA_DIR = "/data" if os.path.exists("/data") else "."
-HISTORY_FILE = os.path.join(DATA_DIR, "permanently_seen_telegram_leads.txt")
+# Each visitor gets their own Telethon session file and dedup history file,
+# derived from their own phone number. This keeps one person's logged-in
+# Telegram account, and one person's "already scraped" history, fully
+# isolated from everyone else using this app -- the same way each person's
+# own YouTube API key never touches anyone else's quota or results.
+import hashlib
 
-# Load history from local file storage if it exists to maintain day-to-day permanent memory
-if "seen_telegram_leads" not in st.session_state:
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            st.session_state.seen_telegram_leads = set(line.strip() for line in f if line.strip())
-    else:
-        st.session_state.seen_telegram_leads = set()
+DATA_DIR = "."
+
+def get_user_session_name(phone):
+    """Unique, filesystem-safe Telethon session filename, scoped to one phone number."""
+    digest = hashlib.sha256(phone.encode("utf-8")).hexdigest()[:16]
+    return os.path.join(DATA_DIR, f"session_{digest}")
+
+def get_user_history_file(phone):
+    """Unique dedup-history file, scoped to one phone number."""
+    digest = hashlib.sha256(phone.encode("utf-8")).hexdigest()[:16]
+    return os.path.join(DATA_DIR, f"seen_leads_{digest}.txt")
 
 # ==========================================
-# ðŸ“Š UTILITIES & TIERING SCHEMAS
+# 📊 UTILITIES & TIERING SCHEMAS
 # ==========================================
 def get_channel_tier(sub_count):
-    if sub_count >= 100000: return "ðŸ“¢ Broadcast Network"
-    if sub_count >= 20000: return "ðŸ‘¥ Large Community"
-    if sub_count >= 5000: return "ðŸŽ¯ Target Hub"
-    return "ðŸŒ± Micro Niche"
+    if sub_count >= 100000: return "📢 Broadcast Network"
+    if sub_count >= 20000: return "👥 Large Community"
+    if sub_count >= 5000: return "🎯 Target Hub"
+    return "🌱 Micro Niche"
 
 def get_engagement_tier(msg_count):
-    if msg_count >= 50: return "ðŸ”¥ Super Fan / Hyperactive"
-    if msg_count >= 15: return "ðŸ’¬ Frequent Contributor"
-    return "ðŸ‘€ Casual Participant"
+    if msg_count >= 50: return "🔥 Super Fan / Hyperactive"
+    if msg_count >= 15: return "💬 Frequent Contributor"
+    return "👀 Casual Participant"
 
 def get_channel_engagement_tier(comments_count):
-    if comments_count >= 15: return "ðŸ”¥ Mega Commenter / Fan"
-    if comments_count >= 5: return "ðŸ’¬ Active Discussant"
-    return "ðŸ‘€ Casual Observer"
-
-SESSION_NAME = os.path.join('/data' if os.path.exists('/data') else '.', 'session_omni_telegram')
+    if comments_count >= 15: return "🔥 Mega Commenter / Fan"
+    if comments_count >= 5: return "💬 Active Discussant"
+    return "👀 Casual Observer"
 
 def get_async_loop():
-    try:
-        return asyncio.get_running_loop()
-    except RuntimeError:
+    """
+    Returns a single, persistent event loop cached for the lifetime of the
+    Streamlit session. Creating a brand-new loop on every script rerun (the
+    original approach) causes Telethon connections to intermittently break
+    with 'event loop is closed' / 'no current event loop' errors, since each
+    rerun is a fresh synchronous execution, not a continuation of a coroutine.
+    """
+    if "_telethon_loop" not in st.session_state:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        return loop
+        st.session_state["_telethon_loop"] = loop
+    return st.session_state["_telethon_loop"]
 
 # ==========================================
-# ðŸ“Š SIDEBAR MANUAL CODES MATRIX
+# 📊 SIDEBAR MANUAL CODES MATRIX
 # ==========================================
 with st.sidebar:
     st.header("Step 1: Master API Keys")
     user_api_id_raw = st.text_input("API ID", placeholder="e.g. 123456")
     user_api_hash = st.text_input("API Hash", type="password")
     user_phone = st.text_input("Account Phone Number", placeholder="+1234567890")
-    
+
     st.divider()
-    
+
     st.header("Step 2: Session Security Activation")
-    request_code_btn = st.button("ðŸ“¨ Request Verification Code", use_container_width=True)
+    request_code_btn = st.button("📨 Request Verification Code", use_container_width=True)
     login_code = st.text_input("Telegram 5-Digit Code", placeholder="12345", type="password")
-    submit_auth_btn = st.button("ðŸ” Complete Web Authentication", use_container_width=True)
-    
+    submit_auth_btn = st.button("🔐 Complete Web Authentication", use_container_width=True)
+
     user_api_id = int(user_api_id_raw) if (user_api_id_raw and user_api_id_raw.isdigit()) else 0
     loop = get_async_loop()
+
+    # Every credential, session file, and dedup history below is keyed off
+    # this phone number -- so each visitor only ever touches their own
+    # Telegram login and their own "already scraped" history, never anyone
+    # else's, even if many people use this app at the same time.
+    SESSION_NAME = get_user_session_name(user_phone) if user_phone else None
+    HISTORY_FILE = get_user_history_file(user_phone) if user_phone else None
+
+    if user_phone and "seen_telegram_leads" not in st.session_state:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                st.session_state.seen_telegram_leads = set(line.strip() for line in f if line.strip())
+        else:
+            st.session_state.seen_telegram_leads = set()
+    elif "seen_telegram_leads" not in st.session_state:
+        st.session_state.seen_telegram_leads = set()
 
     if request_code_btn:
         if user_api_id == 0 or not user_api_hash or not user_phone:
@@ -207,7 +217,7 @@ with st.sidebar:
                 await c.disconnect()
             try:
                 loop.run_until_complete(send_code())
-                st.info("ðŸ“© Login code transmitted! Check your Telegram app.")
+                st.info("📩 Login code transmitted! Check your Telegram app.")
             except Exception as e:
                 st.error(f"Request Failure: {e}")
 
@@ -222,21 +232,21 @@ with st.sidebar:
                 await c.disconnect()
             try:
                 loop.run_until_complete(complete_login())
-                st.success("ðŸŸ¢ Web Session Authorized! You can now scrape across all workspace routes.")
+                st.success("🟢 Web Session Authorized! You can now scrape across all workspace routes.")
             except Exception as e:
                 st.error(f"Sign-In Error: {e}")
 
     st.divider()
-    st.header("ðŸ“Š Pipeline Sync")
+    st.header("📊 Pipeline Sync")
     user_gsheet_url = st.text_input("Google Apps Script URL", placeholder="https://script.google.com/...")
-    
+
     st.divider()
-    st.markdown(f"ðŸ“¦ **Permanent Memory History:** `{len(st.session_state.seen_telegram_leads)}` unique targets remembered.")
+    st.markdown(f"📦 **Permanent Memory History:** `{len(st.session_state.seen_telegram_leads)}` unique targets remembered.")
 
 # ==========================================
-#âš¡ CORE TELEGRAM ASYNC LEAD EXTRACTION LOOPS
+#⚡ CORE TELEGRAM ASYNC LEAD EXTRACTION LOOPS
 # ==========================================
-async def harvest_telegram_leads(api_id, api_hash, keyword, min_subs, max_subs, limit):
+async def harvest_telegram_leads(api_id, api_hash, session_name, history_file, keyword, min_subs, max_subs, limit):
     async def run():
         search_results = await client(SearchRequest(q=keyword, limit=limit * 5))
         leads_data = []
@@ -257,13 +267,13 @@ async def harvest_telegram_leads(api_id, api_hash, keyword, min_subs, max_subs, 
                     if min_subs <= sub_count <= max_subs:
                         # Commit identifier permanently to file structures
                         st.session_state.seen_telegram_leads.add(unique_id)
-                        with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+                        with open(history_file, "a", encoding="utf-8") as f:
                             f.write(f"{unique_id}\n")
 
                         leads_data.append({
                             "Community Name": entity.title,
                             "Telegram Username": f"@{entity.username}" if entity.username else "Private/Link Only",
-                            "Channel/Group Type": "ðŸ“¢ Channel" if getattr(entity, 'broadcast', False) else "ðŸ’¬ Megagroup",
+                            "Channel/Group Type": "📢 Channel" if getattr(entity, 'broadcast', False) else "💬 Megagroup",
                             "Subscriber Count": sub_count,
                             "About Bio Description": about_text[:150] + "..." if len(about_text) > 150 else about_text,
                             "Direct Join Link": f"https://t.me/{entity.username}" if entity.username else "N/A"
@@ -271,13 +281,13 @@ async def harvest_telegram_leads(api_id, api_hash, keyword, min_subs, max_subs, 
             except: continue
         return pd.DataFrame(leads_data)
 
-    client = TelegramClient(SESSION_NAME, api_id, api_hash)
+    client = TelegramClient(session_name, api_id, api_hash)
     await client.connect()
     res_df = await run()
     await client.disconnect()
     return res_df
 
-async def mine_top_engagers(api_id, api_hash, target_group, message_limit):
+async def mine_top_engagers(api_id, api_hash, session_name, history_file, target_group, message_limit):
     async def run():
         try: group_entity = await client.get_entity(target_group)
         except Exception as e: return pd.DataFrame()
@@ -312,7 +322,7 @@ async def mine_top_engagers(api_id, api_hash, target_group, message_limit):
             
             # Commit unique contact targets to local persistence system
             st.session_state.seen_telegram_leads.add(profile["MemKey"])
-            with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+            with open(history_file, "a", encoding="utf-8") as f:
                 f.write(f"{profile['MemKey']}\n")
 
             engager_list.append({
@@ -325,13 +335,13 @@ async def mine_top_engagers(api_id, api_hash, target_group, message_limit):
             })
         return pd.DataFrame(engager_list)
 
-    client = TelegramClient(SESSION_NAME, api_id, api_hash)
+    client = TelegramClient(session_name, api_id, api_hash)
     await client.connect()
     res_df = await run()
     await client.disconnect()
     return res_df
 
-async def mine_channel_engagers(api_id, api_hash, target_channel, post_limit):
+async def mine_channel_engagers(api_id, api_hash, session_name, history_file, target_channel, post_limit):
     async def run():
         try: channel_entity = await client.get_entity(target_channel)
         except Exception as e: return pd.DataFrame()
@@ -369,7 +379,7 @@ async def mine_channel_engagers(api_id, api_hash, target_channel, post_limit):
             
             # Commit identifier permanently to block future sweeps tracking this exact commenter
             st.session_state.seen_telegram_leads.add(profile["MemKey"])
-            with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+            with open(history_file, "a", encoding="utf-8") as f:
                 f.write(f"{profile['MemKey']}\n")
 
             channel_leads.append({
@@ -382,7 +392,7 @@ async def mine_channel_engagers(api_id, api_hash, target_channel, post_limit):
             })
         return pd.DataFrame(channel_leads)
 
-    client = TelegramClient(SESSION_NAME, api_id, api_hash)
+    client = TelegramClient(session_name, api_id, api_hash)
     await client.connect()
     res_df = await run()
     await client.disconnect()
@@ -391,9 +401,9 @@ async def mine_channel_engagers(api_id, api_hash, target_channel, post_limit):
 
 # Workspace Tabs
 tab_directory, tab_group, tab_channel = st.tabs([
-    "ðŸ›¡ï¸ Global Directory Search",
-    "ðŸ’¬ Group Chat Engagers", 
-    "ðŸ“¢ Channel Commenters"
+    "🛡️ Global Directory Search",
+    "💬 Group Chat Engagers", 
+    "📢 Channel Commenters"
 ])
 
 # ------------------------------------------
@@ -409,7 +419,7 @@ with tab_directory:
         limit_total = st.number_input("Max Clean Entries Saved", min_value=1, max_value=100, value=15, key="d_limit")
         max_subs_input = st.number_input("Maximum Subscriber Cap", min_value=0, value=500000, step=10000, key="d_max")
         
-    start_dir_btn = st.button("ðŸš€ Scrape Directory Indices", use_container_width=True)
+    start_dir_btn = st.button("🚀 Scrape Directory Indices", use_container_width=True)
     
     if start_dir_btn:
         if user_api_id == 0 or not user_api_hash or not user_phone:
@@ -421,7 +431,7 @@ with tab_directory:
                 try:
                     loop = get_async_loop()
                     df_leads = loop.run_until_complete(
-                        harvest_telegram_leads(user_api_id, user_api_hash, keyword_input, min_subs_input, max_subs_input, limit_total)
+                        harvest_telegram_leads(user_api_id, user_api_hash, SESSION_NAME, HISTORY_FILE, keyword_input, min_subs_input, max_subs_input, limit_total)
                     )
                     if df_leads.empty:
                         st.warning("No new directories matched your parameters or your distributed collection range is already captured.")
@@ -433,7 +443,7 @@ with tab_directory:
                         if user_gsheet_url:
                             requests.post(user_gsheet_url, json=df_sorted.to_dict(orient='records'))
                         csv_bytes = df_sorted.to_csv(index=False).encode('utf-8')
-                        st.download_button("ðŸ“¥ Download Telegram Database (CSV)", csv_bytes, "tg_market_leads.csv", key="d_dl")
+                        st.download_button("📥 Download Telegram Database (CSV)", csv_bytes, "tg_market_leads.csv", key="d_dl")
                 except Exception as e:
                     st.error(f"Mainframe Protocol Exception: {e}")
 
@@ -448,7 +458,7 @@ with tab_group:
     with col_depth:
         message_depth = st.number_input("Message History Scan Depth", min_value=100, max_value=10000, value=1000, step=500, key="g_depth")
         
-    start_group_btn = st.button("ðŸš€ Extract Interactive Engagers", use_container_width=True)
+    start_group_btn = st.button("🚀 Extract Interactive Engagers", use_container_width=True)
     
     if start_group_btn:
         if user_api_id == 0 or not user_api_hash or not user_phone or not group_input:
@@ -458,7 +468,7 @@ with tab_group:
                 try:
                     loop = get_async_loop()
                     df_engagers = loop.run_until_complete(
-                        mine_top_engagers(user_api_id, user_api_hash, group_input.strip(), message_depth)
+                        mine_top_engagers(user_api_id, user_api_hash, SESSION_NAME, HISTORY_FILE, group_input.strip(), message_depth)
                     )
                     if df_engagers.empty:
                         st.warning("No new active human engagers found or session authentication failed.")
@@ -470,7 +480,7 @@ with tab_group:
                         if user_gsheet_url:
                             requests.post(user_gsheet_url, json=df_sorted.to_dict(orient='records'))
                         csv_bytes = df_sorted.to_csv(index=False).encode('utf-8')
-                        st.download_button("ðŸ“¥ Download Top Engagers List", csv_bytes, "tg_top_group_engagers.csv", key="g_dl")
+                        st.download_button("📥 Download Top Engagers List", csv_bytes, "tg_top_group_engagers.csv", key="g_dl")
                 except Exception as e:
                     st.error(f"Network Mainframe Exception: {e}")
 
@@ -485,7 +495,7 @@ with tab_channel:
     with col_posts:
         posts_to_scan = st.number_input("Broadcast Posts Scan Depth", min_value=5, max_value=100, value=20, step=5, key="c_posts")
         
-    start_channel_btn = st.button("ðŸš€ Extract Broadcast Commenters", use_container_width=True)
+    start_channel_btn = st.button("🚀 Extract Broadcast Commenters", use_container_width=True)
     
     if start_channel_btn:
         if user_api_id == 0 or not user_api_hash or not user_phone or not channel_input:
@@ -495,7 +505,7 @@ with tab_channel:
                 try:
                     loop = get_async_loop()
                     df_channel_leads = loop.run_until_complete(
-                        mine_channel_engagers(user_api_id, user_api_hash, channel_input.strip(), posts_to_scan)
+                        mine_channel_engagers(user_api_id, user_api_hash, SESSION_NAME, HISTORY_FILE, channel_input.strip(), posts_to_scan)
                     )
                     if df_channel_leads.empty:
                         st.warning("No new public active commenters detected in the specified post range.")
@@ -507,6 +517,6 @@ with tab_channel:
                         if user_gsheet_url:
                             requests.post(user_gsheet_url, json=df_sorted.to_dict(orient='records'))
                         csv_bytes = df_sorted.to_csv(index=False).encode('utf-8')
-                        st.download_button("ðŸ“¥ Export Channel Engagers (CSV)", csv_bytes, "tg_channel_commenters.csv", key="c_dl")
+                        st.download_button("📥 Export Channel Engagers (CSV)", csv_bytes, "tg_channel_commenters.csv", key="c_dl")
                 except Exception as e:
                     st.error(f"Network Protocol Exception: {e}")

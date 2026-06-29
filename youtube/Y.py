@@ -6,7 +6,7 @@ import os
 from googleapiclient.discovery import build
 
 # --- Page Configuration ---
-st.set_page_config(page_title="Leadstack YouTube", layout="wide", page_icon="🎥")
+st.set_page_config(page_title="Free YouTube Scraper | Leadstack", layout="wide", page_icon="🎥")
 
 # --- Professional Light Mode & YouTube Red Accent Injection ---
 st.markdown("""

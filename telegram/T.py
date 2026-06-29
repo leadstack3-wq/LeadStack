@@ -10,7 +10,7 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 # ==========================================
 # 🎨 STREAMLIT PAGE CONFIG & TELEGRAM THEME
 # ==========================================
-st.set_page_config(page_title="Leadstack Telegram", layout="wide", page_icon="✉️")
+st.set_page_config(page_title="Free Telegram Scraper | Leadstack", layout="wide", page_icon="✉️")
 
 st.markdown("""
 <style>
@@ -110,8 +110,8 @@ st.markdown(
     "<div style='padding:22px; border-radius:18px;"
     "background: linear-gradient(90deg, #24A1DE, #147CB0);"
     "color: white; margin-bottom: 1.5rem; box-shadow: 0 6px 20px rgba(36,161,222,0.2);'>"
-    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>✉️ Telegram Leads Generator</h1>"
-    "<p style='margin:5px 0 0 0; color:#FFFFFF !important; opacity:0.95; font-size:15px;'>Headless community mapping & engagement behavior analytics hub</p>"
+    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>✉️ Free Telegram Scraper</h1>"
+    "<p style='margin:5px 0 0 0; color:#FFFFFF !important; opacity:0.95; font-size:15px;'>Export Telegram leads to Google Sheets or Download CSV.</p>"
     "</div>",
     unsafe_allow_html=True
 )

@@ -118,8 +118,8 @@ st.markdown(
     "<div style='padding:22px; border-radius:18px;"
     "background: linear-gradient(90deg, #FF0000, #CC0000);"
     "color: white; margin-bottom: 1.5rem; box-shadow: 0 8px 25px rgba(255,0,0,0.2);'>"
-    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>🎥 YouTube Leads Generator</h1>"
-    "<p style='margin:5px 0 0 0; color:#FFFFFF !important; opacity:0.95; font-size:15px;'>Query, filter, and isolate creators using Subscribers, Video Counts, Channel Views, and About-bio keywords.</p>"
+    "<h1 style='margin:0; color:#FFFFFF !important; font-size:28px;'>🎥 Free YouTube Scraper</h1>"
+    "<p style='margin:5px 0 0 0; color:#FFFFFF !important; opacity:0.95; font-size:15px;'>Export YouTube Leads to Google Sheets or Download CSV</p>"
     "</div>",
     unsafe_allow_html=True
 )

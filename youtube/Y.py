@@ -1,9 +1,10 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import re
 import requests
 import os
 from googleapiclient.discovery import build
+import streamlit_analytics2 as streamlit_analytics
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Free YouTube Scraper | Leadstack", layout="wide", page_icon="🎥")
@@ -263,122 +264,123 @@ def fetch_youtube_channels(api_key, keyword, region_code, min_subs, max_subs, mi
 # =====================
 # SIDEBAR NAVIGATION
 # =====================
-with st.sidebar:
-    st.header("🔑 Google API Token")
-    api_token = st.text_input("YouTube Data API Key", type="password", help="Obtain a v3 API key from Google Cloud Console.")
-    
+with streamlit_analytics.track():
+    with st.sidebar:
+        st.header("🔑 Google API Token")
+        api_token = st.text_input("YouTube Data API Key", type="password", help="Obtain a v3 API key from Google Cloud Console.")
+        
+        st.divider()
+        st.header("📊 Delivery Destination")
+        user_gsheet_url = st.text_input("Google Apps Script URL", placeholder="https://script.google.com/...")
+        
+        st.divider()
+        st.markdown(f"📦 **Permanent Memory History:** `{len(st.session_state.seen_youtube_channels)}` channels remembered.")
+        
+        start_button = st.button("🚀 Harvest YouTube Channels", use_container_width=True)
+
+    # =========================================================================
+    # WORKSPACE LAYOUT
+    # =========================================================================
+
+    # Row 1: Target Parameters
+    row1_col1, row1_col2, row1_col3 = st.columns(3)
+    with row1_col1:
+        keyword_input = st.text_input("Niche Main Keyword", "Cooking")
+    with row1_col2:
+        region_input = st.text_input("ISO Country Code Filter", "US")
+    with row1_col3:
+        limit_total = st.number_input("Maximum Results Requested", min_value=1, max_value=50, value=15)
+
     st.divider()
-    st.header("📊 Delivery Destination")
-    user_gsheet_url = st.text_input("Google Apps Script URL", placeholder="https://script.google.com/...")
-    
+
+    # Row 2: Audience Metrics Floors & Ceilings
+    st.subheader("Granular Metrics Filter Configuration")
+    c1, c2 = st.columns(2)
+    with c1:
+        min_subs_input = st.number_input("Minimum Subscribers", min_value=0, value=10000, step=1000)
+        min_videos_input = st.number_input("Total Videos (Min)", min_value=0, value=50, step=10)
+        min_views_input = st.number_input("Minimum Total Views", min_value=0, value=100000, step=25000)
+    with c2:
+        max_subs_input = st.number_input("Maximum Subscribers", min_value=0, value=2000000, step=100000)
+        max_videos_input = st.number_input("Total Videos (Max)", min_value=0, value=5000, step=100)
+        max_views_input = st.number_input("Maximum Total Views", min_value=0, value=500000000, step=1000000)
+
     st.divider()
-    st.markdown(f"📦 **Permanent Memory History:** `{len(st.session_state.seen_youtube_channels)}` channels remembered.")
-    
-    start_button = st.button("🚀 Harvest YouTube Channels", use_container_width=True)
 
-# =========================================================================
-# WORKSPACE LAYOUT
-# =========================================================================
+    # Row 3: Advanced Data Filtering & Parsing Matrix
+    st.subheader("Advanced Data Filtering & Parsing Matrix")
+    about_keywords_input = st.text_input("Keywords to search in Channel 'About'", placeholder="e.g. email, sponsorship, pr, review (comma-separated)")
 
-# Row 1: Target Parameters
-row1_col1, row1_col2, row1_col3 = st.columns(3)
-with row1_col1:
-    keyword_input = st.text_input("Niche Main Keyword", "Cooking")
-with row1_col2:
-    region_input = st.text_input("ISO Country Code Filter", "US")
-with row1_col3:
-    limit_total = st.number_input("Maximum Results Requested", min_value=1, max_value=50, value=15)
+    # UPGRADE: Placed the checkboxes side-by-side cleanly using a sub-column row matrix layout
+    col_check1, col_check2 = st.columns(2)
+    with col_check1:
+        only_email_toggle = st.checkbox("Strict Verification: Only return channels with an identified email address", value=False)
+    with col_check2:
+        only_link_toggle = st.checkbox("Strict Verification: Only return channels with an identified Website/Social Link", value=False)
 
-st.divider()
-
-# Row 2: Audience Metrics Floors & Ceilings
-st.subheader("Granular Metrics Filter Configuration")
-c1, c2 = st.columns(2)
-with c1:
-    min_subs_input = st.number_input("Minimum Subscribers", min_value=0, value=10000, step=1000)
-    min_videos_input = st.number_input("Total Videos (Min)", min_value=0, value=50, step=10)
-    min_views_input = st.number_input("Minimum Total Views", min_value=0, value=100000, step=25000)
-with c2:
-    max_subs_input = st.number_input("Maximum Subscribers", min_value=0, value=2000000, step=100000)
-    max_videos_input = st.number_input("Total Videos (Max)", min_value=0, value=5000, step=100)
-    max_views_input = st.number_input("Maximum Total Views", min_value=0, value=500000000, step=1000000)
-
-st.divider()
-
-# Row 3: Advanced Data Filtering & Parsing Matrix
-st.subheader("Advanced Data Filtering & Parsing Matrix")
-about_keywords_input = st.text_input("Keywords to search in Channel 'About'", placeholder="e.g. email, sponsorship, pr, review (comma-separated)")
-
-# UPGRADE: Placed the checkboxes side-by-side cleanly using a sub-column row matrix layout
-col_check1, col_check2 = st.columns(2)
-with col_check1:
-    only_email_toggle = st.checkbox("Strict Verification: Only return channels with an identified email address", value=False)
-with col_check2:
-    only_link_toggle = st.checkbox("Strict Verification: Only return channels with an identified Website/Social Link", value=False)
-
-# Scraper Execution Pipeline
-if start_button:
-    if not api_token:
-        st.error("Please supply a valid YouTube API Key in the sidebar.")
-    elif min_subs_input >= max_subs_input:
-        st.error("The minimum subscriber threshold must be less than the maximum ceiling threshold.")
-    elif min_videos_input >= max_videos_input:
-        st.error("The minimum video count threshold must be less than the maximum video count threshold.")
-    elif min_views_input >= max_views_input:
-        st.error("The minimum views threshold must be less than the maximum views threshold.")
-    else:
-        with st.spinner("Quizzing official YouTube database infrastructure..."):
-            try:
-                df_results = fetch_youtube_channels(
-                    api_token,
-                    keyword_input,
-                    region_input.upper().strip(),
-                    min_subs_input,
-                    max_subs_input,
-                    min_videos_input,
-                    max_videos_input,
-                    min_views_input,
-                    max_views_input,
-                    about_keywords_input,
-                    only_email_toggle,
-                    only_link_toggle,
-                    limit_total
-                )
-                
-                if df_results.empty:
-                    st.warning("No new creators matched your specific layer combination of metrics filters and text criteria.")
-                else:
-                    df_results["Creator Tier"] = df_results["Subscriber Count"].apply(get_channel_tier)
-                    df_sorted = df_results.sort_values(by="Subscriber Count", ascending=False)
+    # Scraper Execution Pipeline
+    if start_button:
+        if not api_token:
+            st.error("Please supply a valid YouTube API Key in the sidebar.")
+        elif min_subs_input >= max_subs_input:
+            st.error("The minimum subscriber threshold must be less than the maximum ceiling threshold.")
+        elif min_videos_input >= max_videos_input:
+            st.error("The minimum video count threshold must be less than the maximum video count threshold.")
+        elif min_views_input >= max_views_input:
+            st.error("The minimum views threshold must be less than the maximum views threshold.")
+        else:
+            with st.spinner("Quizzing official YouTube database infrastructure..."):
+                try:
+                    df_results = fetch_youtube_channels(
+                        api_token,
+                        keyword_input,
+                        region_input.upper().strip(),
+                        min_subs_input,
+                        max_subs_input,
+                        min_videos_input,
+                        max_videos_input,
+                        min_views_input,
+                        max_views_input,
+                        about_keywords_input,
+                        only_email_toggle,
+                        only_link_toggle,
+                        limit_total
+                    )
                     
-                    # Styled Metrics Summary Row
-                    m1, m2 = st.columns(2)
-                    with m1:
-                        st.markdown(f"""
-                            <div class="yt-metric-card">
-                                <div class="yt-card-label">Pipelines Compiled</div>
-                                <div class="yt-card-value">📹 {len(df_sorted)} New Channels Found</div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with m2:
-                        avg_subs = int(df_sorted["Subscriber Count"].mean())
-                        st.markdown(f"""
-                            <div class="yt-metric-card">
-                                <div class="yt-card-label">Average Subscriber Base</div>
-                                <div class="yt-card-value">📊 {avg_subs:,} Subs</div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.success(f"Successfully compiled {len(df_sorted)} verified creator pipelines!")
-                    st.dataframe(df_sorted, use_container_width=True)
-                    
-                    if user_gsheet_url:
-                        with st.spinner("Streaming records to Sheets architecture..."):
-                            requests.post(user_gsheet_url, json=df_sorted.to_dict(orient='records'))
-                            st.success("✅ Shared Google Sheet synchronized!")
-                    
-                    csv_data = df_sorted.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Download Filtered Directory (CSV)", csv_data, "youtube_fully_filtered_leads.csv")
-                    
-            except Exception as e:
-                st.error(f"API Interface Error: {e}")
+                    if df_results.empty:
+                        st.warning("No new creators matched your specific layer combination of metrics filters and text criteria.")
+                    else:
+                        df_results["Creator Tier"] = df_results["Subscriber Count"].apply(get_channel_tier)
+                        df_sorted = df_results.sort_values(by="Subscriber Count", ascending=False)
+                        
+                        # Styled Metrics Summary Row
+                        m1, m2 = st.columns(2)
+                        with m1:
+                            st.markdown(f"""
+                                <div class="yt-metric-card">
+                                    <div class="yt-card-label">Pipelines Compiled</div>
+                                    <div class="yt-card-value">📹 {len(df_sorted)} New Channels Found</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with m2:
+                            avg_subs = int(df_sorted["Subscriber Count"].mean())
+                            st.markdown(f"""
+                                <div class="yt-metric-card">
+                                    <div class="yt-card-label">Average Subscriber Base</div>
+                                    <div class="yt-card-value">📊 {avg_subs:,} Subs</div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        
+                        st.success(f"Successfully compiled {len(df_sorted)} verified creator pipelines!")
+                        st.dataframe(df_sorted, use_container_width=True)
+                        
+                        if user_gsheet_url:
+                            with st.spinner("Streaming records to Sheets architecture..."):
+                                requests.post(user_gsheet_url, json=df_sorted.to_dict(orient='records'))
+                                st.success("✅ Shared Google Sheet synchronized!")
+                        
+                        csv_data = df_sorted.to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Download Filtered Directory (CSV)", csv_data, "youtube_fully_filtered_leads.csv")
+                        
+                except Exception as e:
+                    st.error(f"API Interface Error: {e}")
